@@ -1,0 +1,75 @@
+# GitHub Actions публичного репозитория basehub-relay (.github/workflows/relay.yml).
+# Структура репозитория: remote-proto/, relay/ (как в basehub). На тег vX.Y.Z — образ в GHCR
+# (amd64 + arm64) и бинарники linux в Releases; на push в main — только сборка и тесты.
+name: relay
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --features client
+        working-directory: remote-proto
+      - run: cargo test --locked
+        working-directory: relay
+
+  image:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/rus1am89/basehub-relay
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: relay/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # статический бинарник для systemd (arm64 — через Docker-образ)
+  binary:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: sudo apt-get install -y musl-tools
+      - run: cargo build --release --locked --target x86_64-unknown-linux-musl
+        working-directory: relay
+      - run: cp relay/target/x86_64-unknown-linux-musl/release/basehub-relay basehub-relay-linux-x86_64
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            basehub-relay-linux-x86_64
+            relay/basehub-relay.service

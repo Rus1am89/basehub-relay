@@ -1,0 +1,10 @@
+# Свой ретранслятор Basehub Remote. Перед ним нужен HTTPS (wss://): Caddy, nginx или прокси DSM.
+services:
+  basehub-relay:
+    image: ghcr.io/rus1am89/basehub-relay:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8790:8790"
+    environment:
+      RELAY_TRUST_PROXY: "1"        # IP клиентов — из X-Forwarded-For обратного прокси
+      RELAY_MAX_CONN_PER_IP: "20"

@@ -1,0 +1,38 @@
+[package]
+name = "remote-proto"
+version = "0.1.0"
+description = "Basehub Remote: протокол телефон ⇄ ретранслятор ⇄ Basehub на ПК (ключи, сопряжение, шифрование Noise)"
+authors = ["devteamra"]
+edition = "2021"
+rust-version = "1.77"
+license = "MIT"
+
+# Общий код десктопа (src-tauri), телефона (mobile/src-tauri) и ретранслятора (relay).
+# Без ввода-вывода; клиент WebSocket — только с feature "client" (ретранслятору он не нужен).
+
+[features]
+client = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures-util", "dep:rustls"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+snow = "0.9"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+sha2 = "0.10"
+hkdf = "0.12"
+base64 = "0.22"
+
+tokio = { version = "1", features = ["rt", "sync", "time", "macros"], optional = true }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"], optional = true }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"], optional = true }
+# криптопровайдер TLS для wss:// — tokio-tungstenite его не выбирает, без него rustls паникует
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }
+
+[[example]]
+name = "phone"
+required-features = ["client"]
